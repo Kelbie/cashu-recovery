@@ -1,4 +1,4 @@
-import { Wallet, Mint, type Proof, getEncodedToken } from '@cashu/cashu-ts';
+import { Wallet, Mint, type MintKeyset, type Proof, getEncodedToken } from '@cashu/cashu-ts';
 import type { RestoreParams } from './wallets/types';
 
 export interface MintResult {
@@ -65,10 +65,10 @@ async function probeMint(
     return null;
   }
 
-  let keysets: { id: string; unit: string; active: boolean }[];
+  let keysets: MintKeyset[];
   try {
     const res = await mint.getKeySets();
-    keysets = (res.keysets as any[]).filter((k) => k.unit === 'sat');
+    keysets = res.keysets.filter((k) => k.unit === 'sat');
   } catch {
     onProgress({ type: 'mint-skip', mintUrl, message: `Skipping ${mintUrl} (failed to get keysets)` });
     return null;
@@ -122,7 +122,7 @@ async function restoreKeyset(
   if (allProofs.length > 0) {
     try {
       const states = await wallet.checkProofsStates(allProofs);
-      unspent = allProofs.filter((_: Proof, i: number) => (states[i] as any)?.state === 'UNSPENT');
+      unspent = allProofs.filter((_: Proof, i: number) => states[i]?.state === 'UNSPENT');
     } catch {
       // If state check fails, return all (user can verify manually)
     }

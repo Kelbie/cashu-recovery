@@ -1,8 +1,9 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { SeedInput } from './components/SeedInput'
 import { WalletSelector } from './components/WalletSelector'
 import { MintScanCard, type MintScanState } from './components/MintScanCard'
 import { MintDetail } from './components/MintDetail'
+import { TokenCleanerPage } from './components/TokenCleanerPage'
 import { validateMnemonic } from './lib/derivation'
 import { getWallet, DEFAULT_WALLET_ID } from './lib/wallets'
 import { fetchMints } from './lib/discovery'
@@ -10,10 +11,16 @@ import { fetchMintInfo, type MintInfo } from './lib/mint-info'
 import { recoverFromSeed, groupResultsByMint, type MintResult, type ProgressEvent } from './lib/restore'
 
 type Phase = 'idle' | 'recovering' | 'done'
+type RouteId = 'recover' | 'clean-token'
 
 const CASHU_ICON = 'https://avatars.githubusercontent.com/u/114246592?v=4'
 
+function getRouteFromHash(): RouteId {
+  return window.location.hash === '#/clean-token' ? 'clean-token' : 'recover'
+}
+
 export default function App() {
+  const [route, setRoute] = useState<RouteId>(() => getRouteFromHash())
   const [mnemonic, setMnemonic] = useState('')
   const [walletId, setWalletId] = useState(DEFAULT_WALLET_ID)
   const [maxProfiles, setMaxProfiles] = useState(3)
@@ -24,6 +31,12 @@ export default function App() {
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval>>(null)
   const currentMintRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const handleHashChange = () => setRoute(getRouteFromHash())
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
 
   const finalizeMint = useCallback((mintUrl: string) => {
     setMintScans(prev => prev.map(s =>
@@ -132,24 +145,46 @@ export default function App() {
   const grouped = groupResultsByMint(results)
   const totalSats = grouped.reduce((s, r) => s + r.totalSats, 0)
   const totalProofs = grouped.reduce((s, r) => s + r.proofs.length, 0)
+  const navLink = (id: RouteId) => (
+    id === route
+      ? 'bg-cashu/15 text-zinc-100 border-cashu/30'
+      : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-100 hover:border-zinc-700'
+  )
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* Navbar */}
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur-md">
-        <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
+        <div className="mx-auto max-w-5xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-3 sm:py-4">
           <div className="flex items-center gap-3">
             <img src={CASHU_ICON} alt="Cashu" className="h-8 w-8 rounded-lg" />
             <span className="font-sans font-semibold text-zinc-100 text-lg tracking-tight">
               Cashu Recovery
             </span>
           </div>
-          <span className="font-mono text-xs text-zinc-500">Client-side only</span>
+          <div className="flex items-center gap-2">
+            <a
+              href="#/recover"
+              className={`rounded border px-3 py-2 font-mono text-xs font-semibold transition-colors ${navLink('recover')}`}
+            >
+              Recovery
+            </a>
+            <a
+              href="#/clean-token"
+              className={`rounded border px-3 py-2 font-mono text-xs font-semibold transition-colors ${navLink('clean-token')}`}
+            >
+              Clean Token
+            </a>
+          </div>
         </div>
       </nav>
 
+      {route === 'clean-token' ? (
+        <TokenCleanerPage />
+      ) : (
+        <>
       {/* Hero */}
-      <header className="pt-28 pb-8 px-6">
+      <header className="pt-36 sm:pt-28 pb-8 px-6">
         <div className="mx-auto max-w-5xl text-center">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-zinc-100">
             Recover your balance<span className="text-cashu">.</span>
@@ -327,10 +362,12 @@ export default function App() {
           </div>
         </div>
       </main>
+        </>
+      )}
 
       {/* Footer */}
       <footer className="border-t border-zinc-800/60 py-6 px-6">
-        <div className="mx-auto max-w-5xl flex items-center justify-between">
+        <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div className="flex items-center gap-2">
             <img src={CASHU_ICON} alt="" className="h-5 w-5 rounded" />
             <span className="font-mono text-xs text-zinc-600">Cashu Recovery</span>
